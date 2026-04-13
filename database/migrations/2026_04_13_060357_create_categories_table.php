@@ -12,9 +12,7 @@ return new class extends Migration {
     {
         Schema::create('categories', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignUuid('parent_id')->nullable()
-                ->references('id')->on('categories')
-                ->nullOnDelete();
+            $table->foreignUuid('parent_id')->nullable();
             $table->string('name');
             $table->string('slug')->unique();
             $table->text('description')->nullable();
@@ -23,6 +21,10 @@ return new class extends Migration {
             $table->unsignedInteger('sort_order')->default(0);
             $table->softDeletes();
             $table->timestamps();
+        });
+
+        Schema::table('categories', function (Blueprint $table) {
+            $table->foreign('parent_id')->references('id')->on('categories')->nullOnDelete();
         });
     }
 
