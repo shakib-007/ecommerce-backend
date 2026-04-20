@@ -1,19 +1,40 @@
 <?php
-
-use Illuminate\Http\Request;
+use App\Http\Controllers\Api\V1\Auth\RegisterController;
+use App\Http\Controllers\Api\V1\Auth\LoginController;
+use App\Http\Controllers\Api\V1\Auth\LogoutController;
+use App\Http\Controllers\Api\V1\Auth\GoogleAuthController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
+Route::prefix('v1')->group(function () {
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+    // ─── Public Auth Routes ───────────────────────────────────────
+    Route::prefix('auth')->group(function () {
+        Route::post('register', RegisterController::class);
+        Route::post('login',    LoginController::class);
+
+        // Google OAuth
+        Route::get('google',          [GoogleAuthController::class, 'redirect']);
+        Route::get('google/callback', [GoogleAuthController::class, 'callback']);
+    });
+
+    // ─── Protected Routes (must be logged in) ─────────────────────
+    Route::middleware('auth:sanctum')->group(function () {
+
+        Route::post('auth/logout', LogoutController::class);
+
+        // Current user profile
+        Route::get('me', function () {
+            return \App\Http\Resources\UserResource::make(
+                request()->user()->load('addresses')
+            );
+        });
+
+        // ─── Admin Only ───────────────────────────────────────────
+        Route::middleware('role:admin')->prefix('admin')->group(function () {
+            // Admin routes will be added in later phases
+            Route::get('test', fn() => response()->json(['message' => 'Admin access confirmed.']));
+        });
+
+    });
+
 });
