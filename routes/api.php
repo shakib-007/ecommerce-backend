@@ -7,6 +7,10 @@ use App\Http\Controllers\Api\V1\Shop\ProductController;
 use App\Http\Controllers\Api\V1\Shop\CategoryController;
 use App\Http\Controllers\Api\V1\Shop\BrandController;
 use App\Http\Controllers\Api\V1\Shop\CartController;
+use App\Http\Controllers\Api\V1\Checkout\AddressController;
+use App\Http\Controllers\Api\V1\Checkout\OrderController;
+use App\Http\Controllers\Api\V1\Payment\PaymentController;
+use App\Http\Controllers\Api\V1\Admin\AdminPaymentController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -48,6 +52,36 @@ Route::prefix('v1')->group(function () {
             Route::delete('/',           [CartController::class, 'clear']);
         });
 
+        // Addresses
+        Route::prefix('addresses')->group(function () {
+            Route::get('/',        [AddressController::class, 'index']);
+            Route::post('/',       [AddressController::class, 'store']);
+            Route::put('/{id}',    [AddressController::class, 'update']);
+            Route::delete('/{id}', [AddressController::class, 'destroy']);
+        });
+
+        // Orders
+        Route::prefix('orders')->group(function () {
+            Route::get('/',     [OrderController::class, 'index']);
+            Route::post('/',    [OrderController::class, 'store']);
+            Route::get('/{id}', [OrderController::class, 'show']);
+        });
+
+        // Initiate payment after order placed
+        Route::post('payment/initiate/{orderId}',
+            [PaymentController::class, 'initiate']
+        );
+
+        // Admin payment management
+        Route::middleware('role:admin')->prefix('admin')->group(function () {
+            Route::post('orders/{orderId}/confirm-cod',
+                [AdminPaymentController::class, 'confirmCod']
+            );
+            Route::post('orders/{orderId}/refund',
+                [AdminPaymentController::class, 'refund']
+            );
+        });
+
     });
 
     // ─── Public Shop Routes ───────────────────────────────────────────
@@ -67,5 +101,12 @@ Route::prefix('v1')->group(function () {
         Route::get('products',          [ProductController::class, 'index']);
         Route::get('products/{slug}',   [ProductController::class, 'show']);
 
+    });
+
+    Route::prefix('payment/sslcommerz')->group(function () {
+        Route::post('success', [PaymentController::class, 'sslSuccess']);
+        Route::post('fail',    [PaymentController::class, 'sslFail']);
+        Route::post('cancel',  [PaymentController::class, 'sslCancel']);
+        Route::post('ipn',     [PaymentController::class, 'sslIpn']);
     });
 });
