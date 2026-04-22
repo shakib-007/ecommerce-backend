@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Auth\GoogleAuthController;
 use App\Http\Controllers\Api\V1\Shop\ProductController;
 use App\Http\Controllers\Api\V1\Shop\CategoryController;
 use App\Http\Controllers\Api\V1\Shop\BrandController;
+use App\Http\Controllers\Api\V1\Shop\CartController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
@@ -36,6 +37,15 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:admin')->prefix('admin')->group(function () {
             // Admin routes will be added in later phases
             Route::get('test', fn() => response()->json(['message' => 'Admin access confirmed.']));
+        });
+
+        Route::prefix('cart')->group(function () {
+            Route::get('/',              [CartController::class, 'index']);
+            Route::get('/count',         [CartController::class, 'count']);
+            Route::post('/items',        [CartController::class, 'addItem']);
+            Route::put('/items/{id}',    [CartController::class, 'updateItem']);
+            Route::delete('/items/{id}', [CartController::class, 'removeItem']);
+            Route::delete('/',           [CartController::class, 'clear']);
         });
 
     });
