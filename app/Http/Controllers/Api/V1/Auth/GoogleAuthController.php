@@ -27,27 +27,19 @@ class GoogleAuthController extends Controller
      * Google redirects back here with a code.
      * We exchange it for user info, then issue our own token.
      */
-    public function callback(): JsonResponse
+    public function callback(): RedirectResponse
     {
         try {
-            $googleUser = Socialite::driver('google')
-                ->stateless()
-                ->user();
+            $googleUser = Socialite::driver('google')->stateless()->user();
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Google authentication failed. Please try again.',
-            ], 422);
+            return redirect(env('FRONTEND_URL') . '/login?error=google_failed');
         }
 
         $result = $this->authService->handleGoogleUser($googleUser);
 
-        // In production: redirect to frontend with token in URL
-        // return redirect(env('FRONTEND_URL') . '/auth/callback?token=' . $result['token']);
-
-        return response()->json([
-            'message' => 'Google login successful.',
-            'token'   => $result['token'],
-            'user'    => UserResource::make($result['user']),
-        ]);
+        // Redirect to Next.js callback page with token in URL
+        return redirect(
+            env('FRONTEND_URL') . '/callback?token=' . $result['token']
+        );
     }
 }
