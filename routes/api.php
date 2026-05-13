@@ -39,10 +39,17 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/logout', LogoutController::class);
 
         // Current user profile
-        Route::get('me', function () {
-            return \App\Http\Resources\UserResource::make(
-                request()->user()->load('addresses')
-            );
+        // ── Profile ───────────────────────────────────────────────────────
+        Route::get('me',           [ProfileController::class, 'show']);
+        Route::put('me',           [ProfileController::class, 'update']);
+        Route::put('me/password',  [ProfileController::class, 'updatePassword']);
+
+        // ── Wishlist ──────────────────────────────────────────────────────
+        Route::prefix('wishlist')->group(function () {
+            Route::get('/',                    [WishlistController::class, 'index']);
+            Route::post('/',                   [WishlistController::class, 'store']);
+            Route::get('/check/{variantId}',   [WishlistController::class, 'check']);
+            Route::delete('/{variantId}',      [WishlistController::class, 'destroy']);
         });
 
         // ─── Admin Only ───────────────────────────────────────────
