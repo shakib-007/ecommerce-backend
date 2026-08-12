@@ -61,17 +61,19 @@ class ProductService
             $query->where('base_price', '<=', $filters['max_price']);
         }
 
-        // ── Featured only ────────────────────────────────────────
-        if (!empty($filters['featured'])) {
-            $query->where('is_featured', true);
+        // ── Featured filter ──────────────────────────────────────
+        if (array_key_exists('featured', $filters) && $filters['featured'] !== null && $filters['featured'] !== '') {
+            $query->where('is_featured', filter_var($filters['featured'], FILTER_VALIDATE_BOOLEAN));
         }
 
         // ── In stock only ────────────────────────────────────────
-        if (!empty($filters['in_stock'])) {
-            $query->whereHas('variants', fn($q) =>
-                $q->where('stock_qty', '>', 0)
-                  ->where('is_active', true)
-            );
+        if (array_key_exists('in_stock', $filters) && $filters['in_stock'] !== null && $filters['in_stock'] !== '') {
+            if (filter_var($filters['in_stock'], FILTER_VALIDATE_BOOLEAN)) {
+                $query->whereHas('variants', fn($q) =>
+                    $q->where('stock_qty', '>', 0)
+                      ->where('is_active', true)
+                );
+            }
         }
 
         // ── Filter by variant attributes ─────────────────────────
