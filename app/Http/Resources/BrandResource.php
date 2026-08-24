@@ -15,6 +15,7 @@ class BrandResource extends JsonResource
             'slug'           => $this->slug,
             'logo_url'       => $this->logo_url,
             'website'        => $this->website,
+            'is_active'      => (bool) $this->is_active,
             'products_count' => $this->when(
                 isset($this->products_count),
                 $this->products_count

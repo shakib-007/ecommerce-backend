@@ -2,7 +2,7 @@
 <x-mail::message>
 # Order Confirmed!
 
-Hi {{ $order->user->name }},
+Hi {{ $order->customerName() }},
 
 Thank you for your order. We've received it and are processing it now.
 

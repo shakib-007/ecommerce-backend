@@ -18,7 +18,14 @@ class AdminCouponController extends Controller
             ->latest()
             ->paginate(20);
 
-        return response()->json(['data' => $coupons]);
+        return response()->json([
+            'data' => $coupons->items(),
+            'meta' => [
+                'current_page' => $coupons->currentPage(),
+                'last_page'    => $coupons->lastPage(),
+                'total'        => $coupons->total(),
+            ],
+        ]);
     }
 
     public function store(StoreCouponRequest $request): JsonResponse

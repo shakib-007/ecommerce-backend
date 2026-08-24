@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Events\OrderPlaced;
+use App\Models\Address;
 use App\Models\Cart;
 use App\Models\CartItem;
 use App\Models\Order;
@@ -173,17 +174,169 @@ class OrderService
             // ── 11. Clear the cart ────────────────────────────────
             $this->cartService->clearCart($user);
 
-            // ── 12. Fire event (emails, analytics, etc.) ──────────
-            // This happens AFTER transaction commits
-            // so listeners work with committed data
-            OrderPlaced::dispatch($order);
-
-            return $order->load([
+            $order->load([
                 'items.variant.product.images',
                 'address',
                 'latestPayment',
                 'coupons',
             ]);
+
+            // Fire after commit so email failures cannot roll back the order
+            DB::afterCommit(function () use ($order) {
+                OrderPlaced::dispatch($order);
+            });
+
+            return $order;
+        });
+    }
+
+    /**
+     * Place an order for a guest (no account / not signed in).
+     * Items come from the request payload instead of a server cart.
+     */
+    public function placeGuestOrder(array $data): Order
+    {
+        return DB::transaction(function () use ($data) {
+            $items = collect($data['items']);
+
+            $variantIds = $items->pluck('variant_id');
+
+            $variants = ProductVariant::whereIn('id', $variantIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($items as $item) {
+                $variant = $variants->get($item['variant_id']);
+
+                if (!$variant || !$variant->is_active) {
+                    throw ValidationException::withMessages([
+                        'items' => [
+                            "'{$variant?->sku}' is no longer available."
+                        ],
+                    ]);
+                }
+
+                if ($variant->stock_qty < $item['qty']) {
+                    throw ValidationException::withMessages([
+                        'items' => [
+                            "Only {$variant->stock_qty} units of '{$variant->sku}' available."
+                        ],
+                    ]);
+                }
+            }
+
+            $subtotal = $items->sum(
+                fn($item) => $variants->get($item['variant_id'])->price * $item['qty']
+            );
+
+            $discountTotal = 0;
+            $appliedCoupon = null;
+
+            if (!empty($data['coupon_code'])) {
+                $couponResult  = $this->couponService->apply(
+                    $data['coupon_code'],
+                    $subtotal
+                );
+                $discountTotal = $couponResult['discount'];
+                $appliedCoupon = $couponResult['coupon'];
+            }
+
+            $freeThreshold = (float) SiteSetting::get('free_shipping_threshold', 2000);
+            $shippingFee   = ($subtotal - $discountTotal) >= $freeThreshold
+                ? 0
+                : (float) SiteSetting::get('default_shipping_fee', 120);
+
+            $total = $subtotal - $discountTotal + $shippingFee;
+
+            $shipping = $data['shipping_address'];
+
+            $address = Address::create([
+                'user_id'     => null,
+                'label'       => 'Delivery',
+                'line1'       => $shipping['line1'],
+                'line2'       => $shipping['line2'] ?? null,
+                'city'        => $shipping['city'],
+                'state'       => $shipping['state'] ?? null,
+                'postal_code' => $shipping['postal_code'] ?? null,
+                'country'     => $shipping['country'] ?? 'Bangladesh',
+                'is_default'  => false,
+            ]);
+
+            $guest = $data['guest'];
+
+            $order = Order::create([
+                'user_id'        => null,
+                'guest_name'     => $guest['name'],
+                'guest_email'    => $guest['email'],
+                'guest_phone'    => $guest['phone'],
+                'address_id'     => $address->id,
+                'order_number'   => $this->generateOrderNumber(),
+                'status'         => 'pending',
+                'subtotal'       => $subtotal,
+                'discount_total' => $discountTotal,
+                'shipping_fee'   => $shippingFee,
+                'total'          => $total,
+                'notes'          => $data['notes'] ?? null,
+            ]);
+
+            foreach ($items as $item) {
+                $variant = $variants->get($item['variant_id']);
+                $variant->load('product', 'attributeValues.group');
+
+                $order->items()->create([
+                    'variant_id'       => $variant->id,
+                    'qty'              => $item['qty'],
+                    'unit_price'       => $variant->price,
+                    'line_total'       => $variant->price * $item['qty'],
+                    'variant_snapshot' => [
+                        'product_name' => $variant->product->name,
+                        'sku'          => $variant->sku,
+                        'attrs'        => $variant->attributeValues
+                            ->mapWithKeys(fn($av) => [
+                                $av->group->name => $av->value
+                            ])
+                            ->toArray(),
+                    ],
+                ]);
+
+                ProductVariant::where('id', $variant->id)
+                    ->where('stock_qty', '>=', $item['qty'])
+                    ->decrement('stock_qty', $item['qty']);
+            }
+
+            if ($appliedCoupon) {
+                $order->coupons()->attach($appliedCoupon->id, [
+                    'discount_applied' => $discountTotal,
+                ]);
+            }
+
+            $orderStatus = $data['payment_method'] === 'cod'
+                ? 'confirmed'
+                : 'pending';
+
+            $order->update(['status' => $orderStatus]);
+
+            Payment::create([
+                'order_id' => $order->id,
+                'gateway'  => $data['payment_method'],
+                'amount'   => $total,
+                'status'   => 'pending',
+                'meta'     => ['method' => $data['payment_method'], 'guest' => true],
+            ]);
+
+            $order->load([
+                'items.variant.product.images',
+                'address',
+                'latestPayment',
+                'coupons',
+            ]);
+
+            DB::afterCommit(function () use ($order) {
+                OrderPlaced::dispatch($order);
+            });
+
+            return $order;
         });
     }
 

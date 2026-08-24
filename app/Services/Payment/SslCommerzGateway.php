@@ -19,16 +19,16 @@ class SslCommerzGateway implements PaymentGatewayInterface
             'currency'     => 'BDT',
 
             // Customer info
-            'cus_name'     => $order->user->name,
-            'cus_email'    => $order->user->email,
-            'cus_phone'    => $order->user->phone ?? '01700000000',
+            'cus_name'     => $order->customerName(),
+            'cus_email'    => $order->customerEmail() ?? 'guest@shopora.local',
+            'cus_phone'    => $order->customerPhone() ?? '01700000000',
             'cus_add1'     => $order->address->line1,
             'cus_city'     => $order->address->city,
             'cus_country'  => $order->address->country,
             'cus_postcode' => $order->address->postal_code ?? '1200',
 
             // Shipping info (same as billing for now)
-            'ship_name'    => $order->user->name,
+            'ship_name'    => $order->customerName(),
             'ship_add1'    => $order->address->line1,
             'ship_city'    => $order->address->city,
             'ship_country' => $order->address->country,

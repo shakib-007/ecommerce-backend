@@ -20,6 +20,11 @@ class AdminBrandController extends Controller
 
         return response()->json([
             'data' => BrandResource::collection($brands),
+            'meta' => [
+                'current_page' => $brands->currentPage(),
+                'last_page'    => $brands->lastPage(),
+                'total'        => $brands->total(),
+            ],
         ]);
     }
 

@@ -20,6 +20,13 @@ class OrderDetailResource extends JsonResource
             'notes'          => $this->notes,
             'created_at'     => $this->created_at->toISOString(),
 
+            'user'           => $this->whenLoaded('user', fn() => $this->user ? [
+                'id'    => $this->user->id,
+                'name'  => $this->user->name,
+                'email' => $this->user->email,
+                'phone' => $this->user->phone,
+            ] : null),
+
             // Shipping address snapshot
             'address'        => $this->whenLoaded('address', fn() => [
                 'label'       => $this->address->label,

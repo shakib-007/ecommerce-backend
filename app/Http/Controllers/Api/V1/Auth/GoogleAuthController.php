@@ -2,9 +2,7 @@
 namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\UserResource;
 use App\Services\AuthService;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -18,6 +16,8 @@ class GoogleAuthController extends Controller
      */
     public function redirect(): RedirectResponse
     {
+        $this->assertGoogleConfigured();
+
         return Socialite::driver('google')
             ->stateless()
             ->redirect();
@@ -25,21 +25,31 @@ class GoogleAuthController extends Controller
 
     /**
      * Google redirects back here with a code.
-     * We exchange it for user info, then issue our own token.
+     * We exchange it for user info, then issue our own Sanctum token.
      */
     public function callback(): RedirectResponse
     {
+        $frontend = rtrim((string) config('app.frontend_url'), '/');
+
         try {
+            $this->assertGoogleConfigured();
             $googleUser = Socialite::driver('google')->stateless()->user();
-        } catch (\Exception $e) {
-            return redirect(env('FRONTEND_URL') . '/login?error=google_failed');
+            $result = $this->authService->handleGoogleUser($googleUser);
+        } catch (\Throwable $e) {
+            return redirect($frontend . '/login?error=google_failed');
         }
 
-        $result = $this->authService->handleGoogleUser($googleUser);
+        return redirect($frontend . '/callback?token=' . urlencode($result['token']));
+    }
 
-        // Redirect to Next.js callback page with token in URL
-        return redirect(
-            env('FRONTEND_URL') . '/callback?token=' . $result['token']
-        );
+    private function assertGoogleConfigured(): void
+    {
+        if (
+            blank(config('services.google.client_id'))
+            || blank(config('services.google.client_secret'))
+            || blank(config('services.google.redirect'))
+        ) {
+            abort(500, 'Google OAuth is not configured. Set GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI in .env, then run php artisan config:clear.');
+        }
     }
 }

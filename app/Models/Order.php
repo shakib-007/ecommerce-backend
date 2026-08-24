@@ -3,7 +3,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany, BelongsToMany};
+use Illuminate\Database\Eloquent\Relations\{BelongsTo, HasMany, BelongsToMany, HasOne};
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Order extends Model
@@ -11,7 +11,8 @@ class Order extends Model
     use HasUuids, HasFactory;
 
     protected $fillable = [
-        'user_id', 'address_id', 'order_number', 'status',
+        'user_id', 'guest_name', 'guest_email', 'guest_phone',
+        'address_id', 'order_number', 'status',
         'subtotal', 'discount_total', 'shipping_fee', 'total', 'notes',
     ];
 
@@ -49,14 +50,45 @@ class Order extends Model
                     ->withTimestamps();
     }
 
-    // Latest payment attempt
-    public function latestPayment()
+    /**
+     * Latest payment attempt.
+     * Avoid latestOfMany()/MAX(uuid) — PostgreSQL does not support MAX(uuid).
+     */
+    public function latestPayment(): HasOne
     {
-        return $this->hasOne(Payment::class)->latestOfMany();
+        return $this->hasOne(Payment::class)->whereRaw(
+            'payments.id = (
+                SELECT p.id
+                FROM payments AS p
+                WHERE p.order_id = payments.order_id
+                ORDER BY p.created_at DESC, p.id DESC
+                LIMIT 1
+            )'
+        );
     }
 
     public function isPaid(): bool
     {
         return $this->payments()->where('status', 'paid')->exists();
+    }
+
+    public function customerName(): string
+    {
+        return $this->user?->name ?? $this->guest_name ?? 'Guest';
+    }
+
+    public function customerEmail(): ?string
+    {
+        return $this->user?->email ?? $this->guest_email;
+    }
+
+    public function customerPhone(): ?string
+    {
+        return $this->user?->phone ?? $this->guest_phone;
+    }
+
+    public function isGuest(): bool
+    {
+        return $this->user_id === null;
     }
 }

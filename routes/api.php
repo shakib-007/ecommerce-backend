@@ -3,6 +3,8 @@ use App\Http\Controllers\Api\V1\Auth\RegisterController;
 use App\Http\Controllers\Api\V1\Auth\LoginController;
 use App\Http\Controllers\Api\V1\Auth\LogoutController;
 use App\Http\Controllers\Api\V1\Auth\GoogleAuthController;
+use App\Http\Controllers\Api\V1\User\ProfileController;
+use App\Http\Controllers\Api\V1\User\WishlistController;
 use App\Http\Controllers\Api\V1\Shop\ProductController;
 use App\Http\Controllers\Api\V1\Shop\CategoryController;
 use App\Http\Controllers\Api\V1\Shop\BrandController;
@@ -160,6 +162,9 @@ Route::prefix('v1')->group(function () {
         Route::get('products/{slug}', [ProductController::class, 'show']);
 
     });
+
+    // Guest checkout (no auth)
+    Route::post('checkout/guest', [OrderController::class, 'storeGuest']);
 
     Route::prefix('payment/sslcommerz')->group(function () {
         Route::post('success', [PaymentController::class, 'sslSuccess']);

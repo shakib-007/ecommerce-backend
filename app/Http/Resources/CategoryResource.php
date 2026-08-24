@@ -15,6 +15,7 @@ class CategoryResource extends JsonResource
             'description' => $this->description,
             'image_url'   => $this->image_url,
             'sort_order'  => $this->sort_order,
+            'is_active'   => (bool) $this->is_active,
 
             // Only include children if they were eager-loaded
             'children'    => CategoryResource::collection(
